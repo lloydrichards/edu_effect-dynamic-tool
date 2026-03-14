@@ -64,12 +64,16 @@ commits in these repos to ensure the LLM references current code:
 
 - `.reference/effect/`
 - `.reference/effect-atom/`
+- `.reference/mcp-spec/`
+- `.reference/lab_sszvizero/`
 
 If any of the folders are missing (they are git ignored), clone them into
 `reference/`:
 
-- `https://github.com/Effect-TS/effect.git` -> `.reference/effect/`
-- `https://github.com/Effect-TS/effect-atom.git` -> `.reference/effect-atom/`
+- `https://github.com/Effect-TS/effect-smol.git` -> `.reference/effect/`
+- `https://github.com/tim-smart/effect-atom.git` -> `.reference/effect-atom/`
+- `https://github.com/modelcontextprotocol/modelcontextprotocol.git` -> `.reference/mcp-spec/`
+- `https://github.com/interactivethings/lab_sszvizero.git` -> `.reference/lab_sszvizero/`
 
 ---
 
