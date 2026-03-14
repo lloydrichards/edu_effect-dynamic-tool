@@ -1,5 +1,5 @@
-import { Tool, Toolkit } from "@effect/ai";
 import { Effect, Schema } from "effect";
+import { Tool, Toolkit } from "effect/unstable/ai";
 
 /**
  * Calculator Tool - Safely evaluates mathematical expressions
@@ -7,8 +7,10 @@ import { Effect, Schema } from "effect";
 const calculatorTool = Tool.make("calculate", {
   description:
     "Evaluate a mathematical expression safely. Supports basic arithmetic operations (+, -, *, /), exponentiation (^), and common functions (sin, cos, sqrt, etc). Example: calculate(expression: '2 + 2 * 10')",
-}).setParameters({
-  expression: Schema.String,
+  parameters: Schema.Struct({
+    expression: Schema.String,
+  }),
+  success: Schema.String,
 });
 
 /**
@@ -17,8 +19,10 @@ const calculatorTool = Tool.make("calculate", {
 const echoTool = Tool.make("echo", {
   description:
     "Echo back a message. Useful for testing tool calling. Example: echo(message: 'Hello, World!')",
-}).setParameters({
-  message: Schema.String,
+  parameters: Schema.Struct({
+    message: Schema.String,
+  }),
+  success: Schema.String,
 });
 
 /**
@@ -26,8 +30,14 @@ const echoTool = Tool.make("echo", {
  */
 const getCurrentTimeTool = Tool.make("getCurrentTime", {
   description:
-    "Get the current date and time in UTC. No parameters required. Example: getCurrentTime()",
-}).setParameters({});
+    "Get the current date and time in a given timezone. Example: getCurrentTime(timezone: 'UTC')",
+  parameters: Schema.Struct({
+    timezone: Schema.String.annotate({
+      description: "IANA timezone identifier (e.g. 'UTC', 'America/New_York')",
+    }),
+  }),
+  success: Schema.String,
+});
 
 /**
  * Random Number Tool - Generates a random number in range
@@ -35,9 +45,11 @@ const getCurrentTimeTool = Tool.make("getCurrentTime", {
 const randomNumberTool = Tool.make("randomNumber", {
   description:
     "Generate a random integer between min (inclusive) and max (inclusive). Example: randomNumber(min: 1, max: 100)",
-}).setParameters({
-  min: Schema.Number,
-  max: Schema.Number,
+  parameters: Schema.Struct({
+    min: Schema.Number,
+    max: Schema.Number,
+  }),
+  success: Schema.String,
 });
 
 export const SampleToolkit = Toolkit.make(
@@ -77,9 +89,7 @@ export const SampleToolkitLive = SampleToolkit.toLayer(
                 `Invalid expression: ${error instanceof Error ? error.message : String(error)}`,
               ),
           }).pipe(
-            Effect.catchAll((error) =>
-              Effect.succeed(`Error: ${error.message}`),
-            ),
+            Effect.catch((error) => Effect.succeed(`Error: ${error.message}`)),
           );
         }),
 
@@ -89,13 +99,15 @@ export const SampleToolkitLive = SampleToolkit.toLayer(
           return yield* Effect.succeed(`Echo: ${params.message}`);
         }),
 
-      getCurrentTime: () =>
+      getCurrentTime: (params) =>
         Effect.gen(function* () {
           const now = new Date();
-          const timeString = now.toISOString();
-          yield* Effect.log(`Current time: ${timeString}`);
+          const timeString = now.toLocaleString("en-US", {
+            timeZone: params.timezone,
+          });
+          yield* Effect.log(`Current time (${params.timezone}): ${timeString}`);
           return yield* Effect.succeed(
-            `Current UTC time: ${timeString} (${now.toUTCString()})`,
+            `Current time in ${params.timezone}: ${timeString} (ISO: ${now.toISOString()})`,
           );
         }),
 

@@ -4,14 +4,14 @@ import {
   type ClientStatus,
   type WebSocketEvent,
 } from "@repo/domain/WebSocket";
-import { Effect, PubSub, Ref } from "effect";
+import { Effect, PubSub, Ref, ServiceMap } from "effect";
 
 export type PresenceEventType = typeof WebSocketEvent.Type;
 
-export class PresenceService extends Effect.Service<PresenceService>()(
+export class PresenceService extends ServiceMap.Service<PresenceService>()(
   "PresenceService",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       yield* Effect.log("Initializing PresenceService");
 
       const clientsRef = yield* Ref.make(
@@ -19,7 +19,7 @@ export class PresenceService extends Effect.Service<PresenceService>()(
       );
       const pubsub = yield* PubSub.sliding<PresenceEventType>(1000);
 
-      const generateClientId = () => ClientId.make(crypto.randomUUID());
+      const generateClientId = () => ClientId.makeUnsafe(crypto.randomUUID());
 
       const addClient = (clientId: typeof ClientId.Type, info: ClientInfo) =>
         Effect.gen(function* () {
