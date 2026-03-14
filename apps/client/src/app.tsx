@@ -1,4 +1,5 @@
-import { Result, useAtom } from "@effect-atom/atom-react";
+import { useAtom } from "@effect/atom-react";
+import { AsyncResult } from "effect/unstable/reactivity";
 import bun from "./assets/bun.svg";
 import effect from "./assets/effect.svg";
 import react from "./assets/react.svg";
@@ -12,7 +13,7 @@ import { helloAtom, tickAtom } from "./lib/atom";
 function App() {
   const [result, search] = useAtom(tickAtom);
   const [response, getHello] = useAtom(helloAtom);
-  const event = Result.getOrElse(result, () => null);
+  const event = AsyncResult.getOrElse(result, () => null);
 
   const handleSearch = () => {
     search({ abort: false });
@@ -55,7 +56,7 @@ function App() {
               Call REST API
             </Button>
           </div>
-          {Result.builder(response)
+          {AsyncResult.builder(response)
             .onSuccess((data) => (
               <ResponseCard state="completed" title="REST API Response">
                 <pre>
@@ -67,14 +68,10 @@ function App() {
                 </pre>
               </ResponseCard>
             ))
-            .onFailure((error) => (
+            .onFailure((cause) => (
               <ResponseCard state="error" title="REST API Response">
                 <pre>
-                  <code>
-                    Error: {error._tag}
-                    {"\n"}
-                    Details: {JSON.stringify(error ?? {}, null, 2)}
-                  </code>
+                  <code>Error: {JSON.stringify(cause, null, 2)}</code>
                 </pre>
               </ResponseCard>
             ))

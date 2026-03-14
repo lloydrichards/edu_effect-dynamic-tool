@@ -1,10 +1,11 @@
-import { Result, useAtom, useAtomSet } from "@effect-atom/atom-react";
+import { useAtom, useAtomSet } from "@effect/atom-react";
 import type {
   ClientId,
   ClientInfo,
   ClientStatus,
   WebSocketEvent,
 } from "@repo/domain/WebSocket";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { useEffect, useMemo } from "react";
 import {
   presenceSubscriptionAtom,
@@ -68,7 +69,7 @@ export function PresencePanel() {
     startSubscription();
   }, [startSubscription]);
 
-  const events = Result.getOrElse(
+  const events = AsyncResult.getOrElse(
     eventsResult,
     () => [] as readonly WebSocketEvent[],
   );
@@ -105,9 +106,9 @@ export function PresencePanel() {
     }
   };
 
-  const isConnected = Result.isSuccess(eventsResult);
-  const isConnecting = Result.isInitial(eventsResult);
-  const hasError = Result.isFailure(eventsResult);
+  const isConnected = AsyncResult.isSuccess(eventsResult);
+  const isConnecting = AsyncResult.isInitial(eventsResult);
+  const hasError = AsyncResult.isFailure(eventsResult);
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -134,12 +135,12 @@ export function PresencePanel() {
 
       {/* Error Display */}
       {hasError &&
-        Result.match(eventsResult, {
+        AsyncResult.match(eventsResult, {
           onInitial: () => null,
           onSuccess: () => null,
-          onFailure: (error) => (
+          onFailure: (failure) => (
             <div className="rounded bg-red-100 p-2 text-red-700 text-sm">
-              Error: {String(error)}
+              Error: {String(failure.cause)}
             </div>
           ),
         })}

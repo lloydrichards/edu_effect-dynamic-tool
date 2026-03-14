@@ -1,17 +1,18 @@
-import { DevTools } from "@effect/experimental";
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
-import { Atom } from "@effect-atom/atom-react";
 import { Api } from "@repo/domain/Api";
 import type { ChatResponse, ToolCall } from "@repo/domain/Chat";
 import type { TickEvent } from "@repo/domain/Rpc";
 import { Effect, Layer, Stream } from "effect";
+import { DevTools } from "effect/unstable/devtools";
+import { FetchHttpClient } from "effect/unstable/http";
+import { HttpApiClient } from "effect/unstable/httpapi";
+import { Atom } from "effect/unstable/reactivity";
 import { RpcClient } from "./rpc-client";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:9000";
 const ENABLE_DEVTOOLS = import.meta.env.VITE_ENABLE_DEVTOOLS === "true";
 
 export const runtime = Atom.runtime(
-  RpcClient.Default.pipe(
+  RpcClient.layer.pipe(
     Layer.provideMerge(ENABLE_DEVTOOLS ? DevTools.layer() : Layer.empty),
   ),
 );
@@ -34,32 +35,32 @@ export const tickAtom = runtime.fn(
       }).pipe((self) => (abort ? Effect.interrupt : self)),
     ).pipe(
       Stream.catchTags({
-        RpcClientError: Effect.die,
+        RpcClientError: (e) => Stream.die(e),
       }),
       Stream.mapAccum(
-        { acc: "" },
+        () => ({ acc: "" }),
         (
           state,
-          event,
+          event: typeof TickEvent.Type,
         ): readonly [
           { acc: string },
-          { text: string; event: typeof TickEvent.Type },
+          ReadonlyArray<{ text: string; event: typeof TickEvent.Type }>,
         ] => {
           switch (event._tag) {
             case "starting": {
               const startAcc = "Start";
-              return [{ acc: startAcc }, { text: startAcc, event }] as const;
+              return [{ acc: startAcc }, [{ text: startAcc, event }]] as const;
             }
             case "tick": {
               const tickAcc = `${state.acc}.`;
-              return [{ acc: tickAcc }, { text: tickAcc, event }] as const;
+              return [{ acc: tickAcc }, [{ text: tickAcc, event }]] as const;
             }
             case "end": {
               const endAcc = `${state.acc} End`;
-              return [{ acc: endAcc }, { text: endAcc, event }] as const;
+              return [{ acc: endAcc }, [{ text: endAcc, event }]] as const;
             }
             default:
-              return [state, { text: state.acc, event }] as const;
+              return [state, [{ text: state.acc, event }]] as const;
           }
         },
       ),
@@ -309,7 +310,7 @@ export const chatAtom = runtime.fn(
         },
       ),
       Stream.drop(1),
-      Stream.catchAll((error: unknown) => {
+      Stream.catch((error: unknown) => {
         console.error("[chatAtom] Caught unhandled stream error:", error);
         const errorMessage =
           error instanceof Error
