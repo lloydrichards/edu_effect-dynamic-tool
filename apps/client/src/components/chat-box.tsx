@@ -1,6 +1,7 @@
-import { Result, useAtom } from "@effect-atom/atom-react";
+import { useAtom } from "@effect/atom-react";
 import type { ChatResponse, MessageSegment } from "@repo/domain/Chat";
-import type { NoSuchElementException } from "effect/Cause";
+import type { NoSuchElementError } from "effect/Cause";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { AlertCircle, Loader2, Send } from "lucide-react";
 import { type FC, useEffect, useRef, useState } from "react";
 import { chatAtom } from "@/lib/atoms/chat-atom";
@@ -40,7 +41,7 @@ export function ChatBox() {
     currentResult: typeof result,
   ) => {
     const nextHistory = [...currentHistory];
-    if (Result.isSuccess(currentResult)) {
+    if (AsyncResult.isSuccess(currentResult)) {
       const response = currentResult.value;
       if (response._tag === "complete") {
         const assistantMsg: Message = {
@@ -96,7 +97,7 @@ export function ChatBox() {
   };
 
   // Extract current streaming response
-  const currentResult: ChatResponse = Result.getOrElse(
+  const currentResult: ChatResponse = AsyncResult.getOrElse(
     result,
     () => ({ _tag: "initial" }) as const,
   );
@@ -106,8 +107,8 @@ export function ChatBox() {
     currentResult._tag === "streaming" ? currentResult.currentIteration : null;
 
   // Determine RPC status for display
-  const isWaiting = Result.isWaiting(result);
-  const isFailure = Result.isFailure(result);
+  const isWaiting = AsyncResult.isWaiting(result);
+  const isFailure = AsyncResult.isFailure(result);
   const isStreaming = currentResult._tag === "streaming";
 
   return (
@@ -219,7 +220,7 @@ export function ChatBox() {
                   </Segment>
                 );
               })}
-              {Result.isSuccess(result) &&
+              {AsyncResult.isSuccess(result) &&
                 currentResult._tag === "complete" && (
                   <TokenUsage response={currentResult} />
                 )}
@@ -297,7 +298,7 @@ export function ChatBox() {
 }
 
 const ErrorDisplay: FC<{
-  result: Result.Failure<ChatResponse, NoSuchElementException>;
+  result: AsyncResult.Failure<ChatResponse, NoSuchElementError>;
 }> = ({ result }) => {
   return (
     <div className="flex w-full justify-center">
