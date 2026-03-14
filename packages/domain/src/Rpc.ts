@@ -1,5 +1,6 @@
 import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
+import { ChatMessage, ChatStreamPart } from "./Chat";
 
 // Define Event RPC
 
@@ -15,6 +16,13 @@ export class EventRpc extends RpcGroup.make(
       ticks: Schema.Number,
     }),
     success: TickEvent,
+    stream: true,
+  }),
+  Rpc.make("chat", {
+    payload: Schema.Struct({
+      messages: Schema.Array(ChatMessage),
+    }),
+    success: ChatStreamPart,
     stream: true,
   }),
 ) {}
