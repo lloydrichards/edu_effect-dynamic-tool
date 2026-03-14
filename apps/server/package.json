@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "bun build src/index.ts --outdir=dist --target=bun --minify",
+    "build": "bun build src/index.ts --outdir=dist --target=bun --minify --external=@effect/ai --external=@effect/ai-anthropic",
     "build:types": "tsc --emitDeclarationOnly",
     "dev": "bun --watch run src/index.ts",
     "test": "vitest run",
@@ -12,6 +12,8 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
+    "@effect/ai": "^0.33.2",
+    "@effect/ai-anthropic": "^0.23.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",

@@ -1,6 +1,12 @@
+import { Prompt } from "@effect/ai";
 import { DevTools } from "@effect/experimental";
 import { NodeSdk } from "@effect/opentelemetry";
-import { HttpApiBuilder, HttpLayerRouter, HttpServer } from "@effect/platform";
+import {
+  FetchHttpClient,
+  HttpApiBuilder,
+  HttpLayerRouter,
+  HttpServer,
+} from "@effect/platform";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { RpcSerialization, RpcServer } from "@effect/rpc";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -12,8 +18,11 @@ import {
   type WebSocketEvent,
   WebSocketRpc,
 } from "@repo/domain/WebSocket";
-import { Config, Effect, Layer, Mailbox, Queue, Stream } from "effect";
+import { Config, Effect, Layer, Mailbox, Option, Queue, Stream } from "effect";
+import { ChatService } from "./services/ChatService";
+import { AnthropicModelLive } from "./services/LanguageModel";
 import { PresenceService } from "./services/PresenceService";
+import { SampleToolkitLive } from "./toolkits/SampleToolkit";
 
 const HealthGroupLive = HttpApiBuilder.group(Api, "health", (handlers) =>
   handlers.handle("get", () => Effect.succeed("Hello Effect!")),
@@ -31,6 +40,7 @@ const HelloGroupLive = HttpApiBuilder.group(Api, "hello", (handlers) =>
 
 const EventRpcLive = EventRpc.toLayer(
   Effect.gen(function* () {
+    const chatService = yield* ChatService;
     yield* Effect.log("Starting Event RPC Live Implementation");
     return {
       tick: Effect.fn(function* (payload) {
@@ -50,6 +60,20 @@ const EventRpcLive = EventRpc.toLayer(
         );
         return mailbox;
       }),
+
+      chat: ({ messages }) =>
+        chatService.chat(
+          messages.map((msg) => {
+            if (msg.role === "system") {
+              return Prompt.makeMessage(msg.role, {
+                content: msg.content,
+              });
+            }
+            return Prompt.makeMessage(msg.role, {
+              content: [Prompt.makePart("text", { text: msg.content })],
+            });
+          }),
+        ),
     };
   }),
 );
@@ -181,6 +205,10 @@ const HttpRpcRouter = RpcServer.layerHttpRouter({
   spanPrefix: "rpc",
 }).pipe(
   Layer.provide(EventRpcLive),
+  Layer.provide(ChatService.Default),
+  Layer.provide(SampleToolkitLive),
+  Layer.provide(AnthropicModelLive),
+  Layer.provide(FetchHttpClient.layer),
   Layer.provide(RpcSerialization.layerNdjson),
 );
 
