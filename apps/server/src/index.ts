@@ -1,14 +1,5 @@
-import { Prompt } from "@effect/ai";
-import { DevTools } from "@effect/experimental";
-import { NodeSdk } from "@effect/opentelemetry";
-import {
-  FetchHttpClient,
-  HttpApiBuilder,
-  HttpLayerRouter,
-  HttpServer,
-} from "@effect/platform";
+import * as NodeSdk from "@effect/opentelemetry/NodeSdk";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { RpcSerialization, RpcServer } from "@effect/rpc";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Api, type ApiResponse } from "@repo/domain/Api";
@@ -18,7 +9,20 @@ import {
   type WebSocketEvent,
   WebSocketRpc,
 } from "@repo/domain/WebSocket";
-import { Config, Effect, Layer, Mailbox, Option, Queue, Stream } from "effect";
+import {
+  type Cause,
+  Config,
+  Effect,
+  Layer,
+  Option,
+  Queue,
+  Stream,
+} from "effect";
+import { Prompt } from "effect/unstable/ai";
+import { DevTools } from "effect/unstable/devtools";
+import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { ChatService } from "./services/ChatService";
 import { AnthropicModelLive } from "./services/LanguageModel";
 import { PresenceService } from "./services/PresenceService";
@@ -45,20 +49,20 @@ const EventRpcLive = EventRpc.toLayer(
     return {
       tick: Effect.fn(function* (payload) {
         yield* Effect.log("Creating new tick stream");
-        const mailbox = yield* Mailbox.make<typeof TickEvent.Type>();
+        const queue = yield* Queue.make<typeof TickEvent.Type, Cause.Done>();
         yield* Effect.forkScoped(
           Effect.gen(function* () {
-            yield* mailbox.offer({ _tag: "starting" });
+            yield* Queue.offer(queue, { _tag: "starting" });
             yield* Effect.sleep("3 seconds");
             for (let i = 0; i < payload.ticks; i++) {
               yield* Effect.sleep("1 second");
-              yield* mailbox.offer({ _tag: "tick" });
+              yield* Queue.offer(queue, { _tag: "tick" });
             }
-            yield* mailbox.offer({ _tag: "end" });
+            yield* Queue.offer(queue, { _tag: "end" });
             yield* Effect.log("End event sent");
-          }).pipe(Effect.ensuring(mailbox.end)),
+          }).pipe(Effect.ensuring(Queue.end(queue))),
         );
-        return mailbox;
+        return queue;
       }),
 
       chat: ({ messages }) =>
@@ -95,14 +99,14 @@ const PresenceRpcLive = WebSocketRpc.toLayer(
           connectedAt,
         };
 
-        const mailbox = yield* Mailbox.make<WebSocketEvent>();
+        const queue = yield* Queue.make<WebSocketEvent, Cause.Done>();
 
         // CRITICAL: Subscribe to PubSub FIRST to ensure we don't miss any events
         const subscription = yield* presence.subscribe();
 
         // Fork the stream consumer to handle incoming PubSub events
         yield* Effect.forkScoped(
-          Stream.fromQueue(subscription).pipe(
+          Stream.fromSubscription(subscription).pipe(
             Stream.tap((event) =>
               Effect.gen(function* () {
                 // Filter out our own user_joined event since we send "connected" instead
@@ -112,15 +116,14 @@ const PresenceRpcLive = WebSocketRpc.toLayer(
                 ) {
                   return;
                 }
-                yield* mailbox.offer(event);
+                yield* Queue.offer(queue, event);
               }),
             ),
             Stream.runDrain,
             Effect.ensuring(
               Effect.gen(function* () {
-                yield* Queue.shutdown(subscription);
                 yield* presence.removeClient(clientId);
-                yield* mailbox.end;
+                yield* Queue.end(queue);
                 yield* Effect.log(
                   `Presence subscription ended for ${clientId}`,
                 );
@@ -136,7 +139,7 @@ const PresenceRpcLive = WebSocketRpc.toLayer(
         yield* presence.addClient(clientId, clientInfo);
 
         // Send our own connected event (not user_joined since we're the one connecting)
-        yield* mailbox.offer({
+        yield* Queue.offer(queue, {
           _tag: "connected",
           clientId,
           connectedAt,
@@ -144,13 +147,13 @@ const PresenceRpcLive = WebSocketRpc.toLayer(
 
         // Send existing clients as user_joined events so we know who's already here
         for (const client of existingClients) {
-          yield* mailbox.offer({
+          yield* Queue.offer(queue, {
             _tag: "user_joined",
             client,
           });
         }
 
-        return mailbox;
+        return queue;
       }),
 
       setStatus: Effect.fn(function* (payload) {
@@ -193,19 +196,19 @@ const TracingConfig = Config.all({
 // ============================================================================
 
 // HTTP API Router
-const ApiRouter = HttpLayerRouter.addHttpApi(Api).pipe(
+const ApiRouter = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(Layer.merge(HealthGroupLive, HelloGroupLive)),
 );
 
 // HTTP RPC Router (for EventRpc - streaming over HTTP)
-const HttpRpcRouter = RpcServer.layerHttpRouter({
+const HttpRpcRouter = RpcServer.layerHttp({
   group: EventRpc,
   path: "/rpc",
   protocol: "http", // Use HTTP for EventRpc
   spanPrefix: "rpc",
 }).pipe(
   Layer.provide(EventRpcLive),
-  Layer.provide(ChatService.Default),
+  Layer.provide(Layer.effect(ChatService)(ChatService.make)),
   Layer.provide(SampleToolkitLive),
   Layer.provide(AnthropicModelLive),
   Layer.provide(FetchHttpClient.layer),
@@ -213,7 +216,7 @@ const HttpRpcRouter = RpcServer.layerHttpRouter({
 );
 
 // WebSocket RPC Router (for PresenceRpc - real-time presence)
-const WebSocketRpcRouter = RpcServer.layerHttpRouter({
+const WebSocketRpcRouter = RpcServer.layerHttp({
   group: WebSocketRpc,
   path: "/ws",
   protocol: "websocket", // Use WebSocket for PresenceRpc!
@@ -221,7 +224,7 @@ const WebSocketRpcRouter = RpcServer.layerHttpRouter({
   disableFatalDefects: true,
 }).pipe(
   Layer.provide(PresenceRpcLive),
-  Layer.provide(PresenceService.Default),
+  Layer.provide(Layer.effect(PresenceService)(PresenceService.make)),
   Layer.provide(RpcSerialization.layerNdjson),
 );
 
@@ -247,7 +250,7 @@ const NodeSdkLive = Effect.gen(function* () {
       new OTLPTraceExporter({ url: endpoint }),
     ),
   }));
-}).pipe(Layer.unwrapEffect);
+}).pipe(Layer.unwrap);
 
 const DevToolsLive = Effect.gen(function* () {
   const config = yield* ServerConfig;
@@ -256,7 +259,7 @@ const DevToolsLive = Effect.gen(function* () {
   }
   yield* Effect.log("Enabling DevTools Layer");
   return DevTools.layer();
-}).pipe(Layer.unwrapEffect);
+}).pipe(Layer.unwrap);
 
 const HttpLive = Effect.gen(function* () {
   const config = yield* ServerConfig;
@@ -274,7 +277,7 @@ const HttpLive = Effect.gen(function* () {
     WebSocketRpcRouter,
   ).pipe(
     Layer.provide(
-      HttpLayerRouter.cors({
+      HttpRouter.cors({
         allowedOrigins,
         allowedMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization", "B3", "traceparent"],
@@ -283,12 +286,16 @@ const HttpLive = Effect.gen(function* () {
     ),
   );
 
-  return HttpLayerRouter.serve(AllRouters).pipe(
+  return HttpRouter.serve(AllRouters).pipe(
     HttpServer.withLogAddress,
     Layer.provideMerge(DevToolsLive),
     Layer.provideMerge(NodeSdkLive),
     Layer.provideMerge(BunHttpServer.layerConfig(ServerConfig)),
   );
-}).pipe(Layer.unwrapEffect, Layer.launch);
+}).pipe(Layer.unwrap, Layer.launch) as Effect.Effect<
+  never,
+  Config.ConfigError,
+  never
+>;
 
 BunRuntime.runMain(HttpLive);
