@@ -1,7 +1,10 @@
 import type { ChatStreamPart } from "@repo/domain/Chat";
 import { Cause, Effect, Layer, Queue, ServiceMap, String } from "effect";
 import { Chat, Prompt, Toolkit } from "effect/unstable/ai";
-import { createMcpToolkit } from "../toolkits/McpToolkit";
+import {
+  ExternalMcpToolkit,
+  LocalMcpToolkit,
+} from "../toolkits/McpToolkitService";
 import { SampleToolkit } from "../toolkits/SampleToolkit";
 import { runAgenticLoop } from "../workflows/agenticLoop";
 
@@ -29,25 +32,23 @@ export class ChatService extends ServiceMap.Service<ChatService>()(
               Prompt.make(history).pipe(Prompt.setSystem(systemMessage)),
             );
 
-            const localMcpToolkit = yield* createMcpToolkit({
-              url: "http://localhost:9009/mcp",
-              namePrefix: "localMcp_",
-            });
-            const externalMcpToolkit = yield* createMcpToolkit({
-              url: "https://remote.mcpservers.org/fetch/mcp",
-              namePrefix: "externalMcp_",
-            });
+            const localMcpToolkit = yield* LocalMcpToolkit;
+            const externalMcpToolkit = yield* ExternalMcpToolkit;
+
+            const localToolkit = yield* localMcpToolkit.getToolkit();
+            const externalToolkit = yield* externalMcpToolkit.getToolkit();
 
             const activeToolkit = Toolkit.merge(
               SampleToolkit,
-              localMcpToolkit.toolkit,
-              externalMcpToolkit.toolkit,
+              localToolkit,
+              externalToolkit,
             );
 
+            const localLayer = yield* localMcpToolkit.getLayer();
+            const externalLayer = yield* externalMcpToolkit.getLayer();
+
             const toolkit = yield* Effect.fromYieldable(activeToolkit).pipe(
-              Effect.provide(
-                Layer.mergeAll(localMcpToolkit.layer, externalMcpToolkit.layer),
-              ),
+              Effect.provide(Layer.mergeAll(localLayer, externalLayer)),
             );
 
             yield* runAgenticLoop({
