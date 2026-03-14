@@ -1,0 +1,26 @@
+diff --git a/dist/AnthropicLanguageModel.js b/dist/AnthropicLanguageModel.js
+index e311d585b538b5865c2820fdbbac0f241c2886b1..e86df97b6aad87710b181f2bb14244734a6cf01f 100644
+--- a/dist/AnthropicLanguageModel.js
++++ b/dist/AnthropicLanguageModel.js
+@@ -566,9 +566,9 @@ const prepareTools = /*#__PURE__*/Effect.fnUntraced(function* ({
+   const userTools = [];
+   const providerTools = [];
+   for (const tool of options.tools) {
+-    if (Tool.isUserDefined(tool)) {
++    if (Tool.isUserDefined(tool) || Tool.isDynamic(tool)) {
+       const description = Tool.getDescription(tool);
+-      const input_schema = yield* tryJsonSchema(tool.parametersSchema, "prepareTools");
++      const input_schema = Tool.isDynamic(tool) ? Tool.getJsonSchema(tool) : yield* tryJsonSchema(tool.parametersSchema, "prepareTools");
+       const toolStrict = Tool.getStrictMode(tool);
+       const strict = capabilities.supportsStructuredOutput ? toolStrict ?? config.strictJsonSchema ?? true : undefined;
+       userTools.push({
+@@ -2093,6 +2093,9 @@ const transformToolCallParams = /*#__PURE__*/Effect.fnUntraced(function* (tools,
+      })
+    });
+  }
++  if (Tool.isDynamic(tool)) {
++    return toolParams;
++  }
+   const {
+     codec
+   } = yield* tryCodecTransform(tool.parametersSchema, "makeResponse");
