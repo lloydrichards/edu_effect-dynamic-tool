@@ -31,6 +31,10 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { ChatService } from "./services/ChatService";
 import { AnthropicModelLive } from "./services/LanguageModel";
 import { PresenceService } from "./services/PresenceService";
+import {
+  ExternalMcpToolkitLive,
+  LocalMcpToolkitLive,
+} from "./toolkits/McpToolkitService";
 import { SampleToolkitLive } from "./toolkits/SampleToolkit";
 
 const HealthGroupLive = HttpApiBuilder.group(Api, "health", (handlers) =>
@@ -216,6 +220,8 @@ const HttpRpcRouter = RpcServer.layerHttp({
   Layer.provide(EventRpcLive),
   Layer.provide(Layer.effect(ChatService)(ChatService.make)),
   Layer.provide(SampleToolkitLive),
+  Layer.provide(LocalMcpToolkitLive),
+  Layer.provide(ExternalMcpToolkitLive),
   Layer.provide(AnthropicModelLive),
   Layer.provide(FetchHttpClient.layer),
   Layer.provide(RpcSerialization.layerNdjson),
