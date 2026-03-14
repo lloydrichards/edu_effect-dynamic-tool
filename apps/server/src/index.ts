@@ -20,7 +20,12 @@ import {
 } from "effect";
 import { Prompt } from "effect/unstable/ai";
 import { DevTools } from "effect/unstable/devtools";
-import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http";
+import {
+  FetchHttpClient,
+  HttpMiddleware,
+  HttpRouter,
+  HttpServer,
+} from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { ChatService } from "./services/ChatService";
@@ -180,6 +185,7 @@ const PresenceRpcLive = WebSocketRpc.toLayer(
 const ServerConfig = Config.all({
   port: Config.number("PORT").pipe(Config.withDefault(9000)),
   hostname: Config.string("HOST").pipe(Config.withDefault("0.0.0.0")),
+  idleTimeout: Config.number("IDLE_TIMEOUT").pipe(Config.withDefault(120)), // seconds (Bun default is 10)
   allowedOrigins: Config.string("ALLOWED_ORIGINS").pipe(
     Config.withDefault("http://localhost:3000"),
   ),
