@@ -28,7 +28,7 @@ vi.mock("effect/unstable/reactivity", () => ({
   },
 }));
 
-vi.mock("./lib/atom", () => ({
+vi.mock("./lib/atoms/chat-atom", () => ({
   chatAtom: vi.fn(),
 }));
 
