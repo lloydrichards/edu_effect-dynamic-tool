@@ -29,16 +29,7 @@ vi.mock("effect/unstable/reactivity", () => ({
 }));
 
 vi.mock("./lib/atom", () => ({
-  helloAtom: vi.fn(),
-  tickAtom: vi.fn(),
   chatAtom: vi.fn(),
-}));
-
-vi.mock("./lib/web-socket-client", () => ({
-  WebSocketClient: {
-    mutation: vi.fn(() => vi.fn()),
-  },
-  presenceSubscriptionAtom: vi.fn(),
 }));
 
 describe("App", () => {
