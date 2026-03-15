@@ -61,23 +61,10 @@ describe("App", () => {
       .toBeVisible();
   });
 
-  test("renders REST API section", async () => {
+  test("does render the Chat section", async () => {
     const screen = await render(<App />);
     await expect
-      .element(screen.getByRole("heading", { name: "REST API" }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "Call REST API" }))
-      .toBeVisible();
-  });
-
-  test("renders RPC API section", async () => {
-    const screen = await render(<App />);
-    await expect
-      .element(screen.getByRole("heading", { name: "RPC API", exact: true }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "Call RPC API" }))
+      .element(screen.getByText("Chat", { exact: true }))
       .toBeVisible();
   });
 
