@@ -89,42 +89,50 @@ export function ChatBox() {
     currentResult._tag === "streaming" ? currentResult.currentIteration : null;
 
   const streamingMessage = useMemo<Message | null>(() => {
+    if (currentResult._tag !== "streaming") return null;
     if (currentSegments.length === 0) return null;
     return {
       role: "assistant",
       message: "",
       segments: currentSegments,
-      usage:
-        currentResult._tag === "complete" ? currentResult.usage : undefined,
-      finishReason:
-        currentResult._tag === "complete"
-          ? currentResult.finishReason
-          : undefined,
     };
-  }, [currentResult, currentSegments]);
+  }, [currentResult._tag, currentSegments]);
 
   const displayHistory = useMemo(() => {
     if (!streamingMessage) return history;
     return [...history, streamingMessage];
   }, [history, streamingMessage]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: append on completion
+  const scrollTrigger = useMemo(
+    () => `${displayHistory.length}-${currentSegments.length}`,
+    [displayHistory.length, currentSegments.length],
+  );
+
+  const completionSnapshot = useMemo(() => {
+    if (currentResult._tag !== "complete") return null;
+    if (currentResult.segments.length === 0) return null;
+    return {
+      segments: currentResult.segments,
+      usage: currentResult.usage,
+      finishReason: currentResult.finishReason,
+    };
+  }, [currentResult]);
+
   useEffect(() => {
-    if (currentResult._tag !== "complete") return;
-    if (currentResult.segments.length === 0) return;
+    if (!completionSnapshot) return;
     setHistory((prev) => [
       ...prev,
       {
         role: "assistant",
         message: "",
-        segments: currentResult.segments,
-        usage: currentResult.usage,
-        finishReason: currentResult.finishReason,
+        segments: completionSnapshot.segments,
+        usage: completionSnapshot.usage,
+        finishReason: completionSnapshot.finishReason,
       },
     ]);
-  }, [currentResult._tag]);
+  }, [completionSnapshot]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll ref only
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrollTrigger is stable string
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -132,7 +140,7 @@ export function ChatBox() {
       top: container.scrollHeight,
       behavior: isStreaming ? "auto" : "smooth",
     });
-  }, [displayHistory.length, currentSegments.length, isStreaming]);
+  }, [scrollTrigger]);
 
   return (
     <div className="flex h-full w-full flex-col rounded-xl border bg-card text-card-foreground shadow-sm">
