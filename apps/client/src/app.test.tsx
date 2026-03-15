@@ -35,20 +35,15 @@ vi.mock("./lib/atoms/chat-atom", () => ({
 describe("App", () => {
   test("renders without crashing", async () => {
     const screen = await render(<App />);
-    await expect.element(screen.getByText("bEvr")).toBeVisible();
+    await expect
+      .element(screen.getByText("edu_effect-dynamic-tool"))
+      .toBeVisible();
   });
 
   test("displays the subtitle", async () => {
     const screen = await render(<App />);
     await expect
-      .element(screen.getByText("Bun + Effect + Vite + React"))
-      .toBeVisible();
-  });
-
-  test("displays the description", async () => {
-    const screen = await render(<App />);
-    await expect
-      .element(screen.getByText("A typesafe fullstack monorepo"))
+      .element(screen.getByText("A simple home for the chat prototype."))
       .toBeVisible();
   });
 
@@ -57,13 +52,5 @@ describe("App", () => {
     await expect
       .element(screen.getByText("Chat", { exact: true }))
       .toBeVisible();
-  });
-
-  test("renders all technology logos", async () => {
-    const screen = await render(<App />);
-    await expect.element(screen.getByAltText("Bun logo")).toBeVisible();
-    await expect.element(screen.getByAltText("Effect logo")).toBeVisible();
-    await expect.element(screen.getByAltText("Vite logo")).toBeVisible();
-    await expect.element(screen.getByAltText("React logo")).toBeVisible();
   });
 });

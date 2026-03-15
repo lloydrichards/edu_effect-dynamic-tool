@@ -143,31 +143,33 @@ export function ChatBox() {
   }, [scrollTrigger]);
 
   return (
-    <div className="flex h-full w-full flex-col rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div className="flex min-h-[60vh] w-full flex-col border border-foreground/30 bg-card text-card-foreground lg:min-h-[70vh]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-6 py-4">
-        <h2 className="font-semibold text-lg">Chat</h2>
+      <div className="flex items-center justify-between border-b border-foreground/30 px-6 py-4">
+        <h2 className="font-display text-2xl uppercase tracking-[0.18em]">
+          Chat
+        </h2>
         <div className="flex gap-2">
           {isStreaming && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+            <span className="inline-flex items-center gap-1 border border-foreground/40 bg-secondary px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-secondary-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Streaming
             </span>
           )}
           {isWaiting && !isStreaming && (
-            <span className="inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-xs font-medium">
+            <span className="inline-flex items-center gap-1 border border-foreground/40 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-[0.2em]">
               <Loader2 className="h-3 w-3 animate-spin" />
               Loading
             </span>
           )}
           {isFailure && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive">
+            <span className="inline-flex items-center gap-1 border border-destructive/60 bg-destructive/10 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-destructive">
               <AlertCircle className="h-3 w-3" />
               Error
             </span>
           )}
           {currentIteration !== null && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+            <span className="inline-flex items-center gap-1 border border-foreground/40 bg-secondary px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-secondary-foreground">
               Iteration {currentIteration}
             </span>
           )}
@@ -179,13 +181,15 @@ export function ChatBox() {
         className="flex-1 min-h-0 overflow-y-auto px-6"
         ref={scrollContainerRef}
       >
-        <div className="space-y-4 py-4">
+        <div className="space-y-6 py-6">
           {/* Empty state */}
           {displayHistory.length === 0 && currentSegments.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <p className="text-sm">
-                Send a message to start chatting. Try asking to calculate
-                something or what time it is.
+            <div className="flex flex-col items-start gap-3 border border-foreground/30 bg-secondary/40 px-4 py-6 text-foreground/80">
+              <p className="text-sm uppercase tracking-[0.28em] text-foreground/60">
+                Empty channel
+              </p>
+              <p className="text-sm leading-relaxed">
+                Start with a clear request.
               </p>
             </div>
           )}
@@ -201,7 +205,7 @@ export function ChatBox() {
               )}
             >
               {msg.role === "user" ? (
-                <div className="rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground whitespace-break-spaces">
+                <div className="border border-foreground/60 bg-primary px-4 py-2 text-sm text-primary-foreground whitespace-break-spaces">
                   {msg.message}
                 </div>
               ) : (
@@ -236,7 +240,7 @@ export function ChatBox() {
           {/* Thinking message */}
           {currentResult._tag === "streaming" && currentResult.thinking && (
             <div className="flex w-full flex-col gap-2 items-start">
-              <div className="text-xs text-muted-foreground px-1">
+              <div className="border border-foreground/30 px-2 py-1 text-[0.65rem] uppercase tracking-[0.2em] text-foreground/60">
                 Thinking: {currentResult.thinking}
               </div>
             </div>
@@ -244,7 +248,7 @@ export function ChatBox() {
 
           {/* Error display from stream */}
           {currentResult._tag === "error" && (
-            <div className="text-destructive text-sm p-3 rounded bg-destructive/10 border border-destructive/30">
+            <div className="text-destructive text-sm p-3 border border-destructive/60 bg-destructive/10">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                 <div className="flex-1">
@@ -257,7 +261,7 @@ export function ChatBox() {
                         const messages = historyToMessages(history);
                         sendMessages(messages);
                       }}
-                      className="mt-2"
+                      className="mt-2 uppercase tracking-[0.2em] text-[0.65rem]"
                     >
                       Retry
                     </Button>
@@ -275,12 +279,12 @@ export function ChatBox() {
       </div>
 
       {/* Input */}
-      <div className="border-t px-6 py-4">
+      <div className="border-t border-foreground/30 px-6 py-4">
         <div className="flex w-full gap-2">
           <input
             type="text"
-            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            placeholder="Send a message..."
+            className="flex-1 border border-foreground/40 bg-background px-3 py-2 text-sm placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            placeholder="Send a message"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
