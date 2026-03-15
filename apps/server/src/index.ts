@@ -20,21 +20,14 @@ import {
 } from "effect";
 import { Prompt } from "effect/unstable/ai";
 import { DevTools } from "effect/unstable/devtools";
-import {
-  FetchHttpClient,
-  HttpMiddleware,
-  HttpRouter,
-  HttpServer,
-} from "effect/unstable/http";
+import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { ChatService } from "./services/ChatService";
 import { AnthropicModelLive } from "./services/LanguageModel";
 import { PresenceService } from "./services/PresenceService";
-import {
-  ExternalMcpToolkitLive,
-  LocalMcpToolkitLive,
-} from "./toolkits/McpToolkitService";
+import { ExternalMcpToolkitLive } from "./toolkits/ExternalMcpToolkit";
+import { LocalMcpToolkitLive } from "./toolkits/LocalMcpToolkit";
 import { SampleToolkitLive } from "./toolkits/SampleToolkit";
 
 const HealthGroupLive = HttpApiBuilder.group(Api, "health", (handlers) =>
