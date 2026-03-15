@@ -3,7 +3,7 @@ import type { ChatResponse, MessageSegment } from "@repo/domain/Chat";
 import type { NoSuchElementError } from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { AlertCircle, Loader2, Send } from "lucide-react";
-import { type FC, useEffect, useRef, useState } from "react";
+import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import { chatAtom } from "@/lib/atoms/chat-atom";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -28,88 +28,111 @@ export function ChatBox() {
   const [result, runChat] = useAtom(chatAtom);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<Message[]>([]);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastSentMessagesRef = useRef<
+    Array<{
+      role: "user" | "assistant" | "system";
+      content: string;
+    }>
+  >([]);
+  const readinessAttemptRef = useRef(0);
 
-  // Auto-scroll to bottom when messages change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intended
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history, result]);
-
-  const appendResultToHistory = (
-    currentHistory: Message[],
-    currentResult: typeof result,
-  ) => {
-    const nextHistory = [...currentHistory];
-    if (AsyncResult.isSuccess(currentResult)) {
-      const response = currentResult.value;
-      if (response._tag === "complete") {
-        const assistantMsg: Message = {
-          role: "assistant",
-          message: "",
-          segments: response.segments,
-          usage: response.usage,
-          finishReason: response.finishReason,
-        };
-        nextHistory.push(assistantMsg);
-      } else if (response._tag === "streaming") {
-        const assistantMsg: Message = {
-          role: "assistant",
-          message: "",
-          segments: response.segments,
-        };
-        nextHistory.push(assistantMsg);
-      }
-    }
-    return nextHistory;
-  };
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-
-    // If there was a previous successful response, add it to history
-    const newHistory = appendResultToHistory(history, result);
-
-    const userMsg: Message = { role: "user", message: input };
-    newHistory.push(userMsg);
-
-    setHistory(newHistory);
-    setInput("");
-
-    // Send full message history to server for context
-    const messages = newHistory.map((msg) => {
-      if (msg.role === "assistant" && msg.segments) {
-        const textContent = msg.segments
-          .filter((seg) => seg._tag === "text")
-          .map((seg) => seg.content)
-          .join("");
-        return {
-          role: msg.role,
-          content: textContent || msg.message,
-        };
-      }
-      return {
-        role: msg.role,
-        content: msg.message,
-      };
-    });
-    runChat(messages);
-  };
-
-  // Extract current streaming response
   const currentResult: ChatResponse = AsyncResult.getOrElse(
     result,
     () => ({ _tag: "initial" }) as const,
   );
+
   const currentSegments =
     currentResult._tag === "initial" ? [] : currentResult.segments;
-  const currentIteration =
-    currentResult._tag === "streaming" ? currentResult.currentIteration : null;
 
-  // Determine RPC status for display
   const isWaiting = AsyncResult.isWaiting(result);
   const isFailure = AsyncResult.isFailure(result);
   const isStreaming = currentResult._tag === "streaming";
+  const sendMessages = (
+    messages: Array<{
+      role: "user" | "assistant" | "system";
+      content: string;
+    }>,
+  ) => {
+    lastSentMessagesRef.current = messages;
+    readinessAttemptRef.current = 0;
+    runChat(messages);
+  };
+
+  useEffect(() => {
+    if (!isFailure) return;
+    if (currentResult._tag !== "error" || !currentResult.error.recoverable) {
+      return;
+    }
+    if (lastSentMessagesRef.current.length === 0) return;
+    if (readinessAttemptRef.current >= 3) return;
+
+    readinessAttemptRef.current += 1;
+    const timeoutId = window.setTimeout(() => {
+      runChat(lastSentMessagesRef.current);
+    }, 600 * readinessAttemptRef.current);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentResult, isFailure, runChat]);
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const userMsg: Message = { role: "user", message: input };
+    setHistory((prev) => [...prev, userMsg]);
+    setInput("");
+
+    const messages = historyToMessages([...history, userMsg]);
+    sendMessages(messages);
+  };
+
+  const currentIteration =
+    currentResult._tag === "streaming" ? currentResult.currentIteration : null;
+
+  const streamingMessage = useMemo<Message | null>(() => {
+    if (currentSegments.length === 0) return null;
+    return {
+      role: "assistant",
+      message: "",
+      segments: currentSegments,
+      usage:
+        currentResult._tag === "complete" ? currentResult.usage : undefined,
+      finishReason:
+        currentResult._tag === "complete"
+          ? currentResult.finishReason
+          : undefined,
+    };
+  }, [currentResult, currentSegments]);
+
+  const displayHistory = useMemo(() => {
+    if (!streamingMessage) return history;
+    return [...history, streamingMessage];
+  }, [history, streamingMessage]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: append on completion
+  useEffect(() => {
+    if (currentResult._tag !== "complete") return;
+    if (currentResult.segments.length === 0) return;
+    setHistory((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        message: "",
+        segments: currentResult.segments,
+        usage: currentResult.usage,
+        finishReason: currentResult.finishReason,
+      },
+    ]);
+  }, [currentResult._tag]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll ref only
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: isStreaming ? "auto" : "smooth",
+    });
+  }, [displayHistory.length, currentSegments.length, isStreaming]);
 
   return (
     <div className="flex h-full w-full flex-col rounded-xl border bg-card text-card-foreground shadow-sm">
@@ -144,10 +167,13 @@ export function ChatBox() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-6"
+        ref={scrollContainerRef}
+      >
         <div className="space-y-4 py-4">
           {/* Empty state */}
-          {history.length === 0 && currentSegments.length === 0 && (
+          {displayHistory.length === 0 && currentSegments.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <p className="text-sm">
                 Send a message to start chatting. Try asking to calculate
@@ -157,7 +183,7 @@ export function ChatBox() {
           )}
 
           {/* History messages */}
-          {history.map((msg, i) => (
+          {displayHistory.map((msg, i) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: stable order in append-only history
               key={i}
@@ -199,34 +225,6 @@ export function ChatBox() {
             </div>
           ))}
 
-          {/* Current streaming response segments */}
-          {currentSegments.length > 0 && (
-            <div className="flex flex-col gap-2 items-start">
-              {currentSegments.map((segment: MessageSegment, idx: number) => {
-                const segmentKey =
-                  segment._tag === "tool-call"
-                    ? `tool-${segment.tool.id}`
-                    : `text-${idx}-${segment.content.slice(0, 50)}`;
-
-                return (
-                  <Segment key={segmentKey}>
-                    {segment._tag === "text" ? (
-                      <div className="w-full py-2 text-sm">
-                        <Markdown content={segment.content} />
-                      </div>
-                    ) : (
-                      <ToolCall segment={segment} />
-                    )}
-                  </Segment>
-                );
-              })}
-              {AsyncResult.isSuccess(result) &&
-                currentResult._tag === "complete" && (
-                  <TokenUsage response={currentResult} />
-                )}
-            </div>
-          )}
-
           {/* Thinking message */}
           {currentResult._tag === "streaming" && currentResult.thinking && (
             <div className="flex w-full flex-col gap-2 items-start">
@@ -248,11 +246,8 @@ export function ChatBox() {
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const messages = history.map((msg) => ({
-                          role: msg.role,
-                          content: msg.message,
-                        }));
-                        runChat(messages);
+                        const messages = historyToMessages(history);
+                        sendMessages(messages);
                       }}
                       className="mt-2"
                     >
@@ -268,7 +263,6 @@ export function ChatBox() {
           {isFailure && <ErrorDisplay result={result} />}
 
           {/* Scroll anchor */}
-          <div ref={bottomRef} />
         </div>
       </div>
 
@@ -282,12 +276,12 @@ export function ChatBox() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            disabled={isWaiting}
+            disabled={isWaiting || isStreaming}
           />
           <Button
             size="icon"
             onClick={handleSend}
-            disabled={!input.trim() || isWaiting}
+            disabled={!input.trim() || isWaiting || isStreaming}
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -296,6 +290,24 @@ export function ChatBox() {
     </div>
   );
 }
+
+const historyToMessages = (messages: Message[]) =>
+  messages.map((msg) => {
+    if (msg.role === "assistant" && msg.segments) {
+      const textContent = msg.segments
+        .filter((seg) => seg._tag === "text")
+        .map((seg) => seg.content)
+        .join("");
+      return {
+        role: msg.role,
+        content: textContent || msg.message,
+      };
+    }
+    return {
+      role: msg.role,
+      content: msg.message,
+    };
+  });
 
 const ErrorDisplay: FC<{
   result: AsyncResult.Failure<ChatResponse, NoSuchElementError>;
