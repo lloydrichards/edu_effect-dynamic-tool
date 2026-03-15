@@ -63,16 +63,11 @@ describe("Server", () => {
           const rpcModule = yield* Effect.promise(
             () => import("@repo/domain/Rpc"),
           );
-          const wsModule = yield* Effect.promise(
-            () => import("@repo/domain/WebSocket"),
-          );
 
           expect(apiModule).toBeDefined();
           expect(apiModule.Api).toBeDefined();
           expect(rpcModule).toBeDefined();
           expect(rpcModule.EventRpc).toBeDefined();
-          expect(wsModule).toBeDefined();
-          expect(wsModule.WebSocketRpc).toBeDefined();
         }),
       { timeout: 15000 },
     );
