@@ -1,5 +1,7 @@
 # edu_effect-dynamic-tool
 
+![Screenshot of edu_effect-dynamic-tool showing the chat interface](./hero.png)
+
 Experimental, educational repo for prototyping Effect v4 beta
 `Tool.dynamic` with MCP. The proof of concept: create a local MCP server
 (`server-mcp`) and fetch tools from it without explicitly declaring schemas.
