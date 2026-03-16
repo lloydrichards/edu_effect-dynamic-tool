@@ -6,12 +6,12 @@ services:
       dockerfile: ./apps/server/Dockerfile
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY?Missing ANTHROPIC_API_KEY}
-      PORT: 9000
+      PORT: ${SERVER_PORT:-9000}
       HOST: 0.0.0.0
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:${CLIENT_PORT:-3000}}
       LOCAL_MCP_URL: http://server-mcp:9009/mcp
     expose:
-      - "9000"
+      - "${SERVER_PORT:-9000}"
     networks:
       - app-network
 
@@ -31,9 +31,9 @@ services:
       context: .
       dockerfile: ./apps/client/Dockerfile
       args:
-        SERVER_URL: ${SERVER_URL:-http://localhost:3000}
+        SERVER_URL: ${SERVER_URL:-http://localhost:${SERVER_PORT:-9000}}
     ports:
-      - "3000:80"
+      - "${CLIENT_PORT:-3000}:${CLIENT_PORT:-3000}"
     networks:
       - app-network
     depends_on:
