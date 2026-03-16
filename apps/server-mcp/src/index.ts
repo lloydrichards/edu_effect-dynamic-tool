@@ -1,8 +1,5 @@
-import * as NodeSdk from "@effect/opentelemetry/NodeSdk";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Config, Effect, Layer, Option, Schema } from "effect";
+import { Config, Effect, Layer, Schema } from "effect";
 import { McpServer, Tool, Toolkit } from "effect/unstable/ai";
 import { DevTools } from "effect/unstable/devtools";
 import { HttpRouter, HttpServer } from "effect/unstable/http";
@@ -73,11 +70,6 @@ const ServerConfig = Config.all({
   enableDevTools: Config.boolean("DEVTOOLS").pipe(Config.withDefault(false)),
 });
 
-const TracingConfig = Config.all({
-  exporterEndpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT")),
-  serviceName: Config.option(Config.string("OTEL_SERVICE_NAME")),
-});
-
 const McpRouter = McpServer.layerHttp({
   name: "BEVR MCP Server",
   version: "0.1.0",
@@ -94,27 +86,6 @@ const McpRouter = McpServer.layerHttp({
   ),
 );
 
-const NodeSdkLive = Effect.gen(function* () {
-  const tracing = yield* TracingConfig;
-  const endpoint = Option.getOrUndefined(tracing.exporterEndpoint);
-  const serviceName = Option.getOrUndefined(tracing.serviceName);
-
-  if (!endpoint || !serviceName) {
-    yield* Effect.log(
-      "OTEL tracing disabled (set OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_SERVICE_NAME to enable)",
-    );
-    return Layer.empty;
-  }
-
-  yield* Effect.log(`OTEL tracing enabled: ${serviceName} -> ${endpoint}`);
-  return NodeSdk.layer(() => ({
-    resource: { serviceName },
-    spanProcessor: new BatchSpanProcessor(
-      new OTLPTraceExporter({ url: endpoint }),
-    ),
-  }));
-}).pipe(Layer.unwrap);
-
 const DevToolsLive = Effect.gen(function* () {
   const config = yield* ServerConfig;
   if (!config.enableDevTools) {
@@ -127,7 +98,6 @@ const DevToolsLive = Effect.gen(function* () {
 const HttpLive = HttpRouter.serve(McpRouter).pipe(
   HttpServer.withLogAddress,
   Layer.provideMerge(DevToolsLive),
-  Layer.provideMerge(NodeSdkLive),
   Layer.provideMerge(BunHttpServer.layerConfig(ServerConfig)),
 );
 
