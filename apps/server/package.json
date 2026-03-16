@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "bun build src/index.ts --outdir=dist --target=bun --minify --external=@effect/ai-anthropic --external=@effect/opentelemetry --external=@opentelemetry/*",
+    "build": "bun build src/index.ts --outdir=dist --target=bun --minify",
     "build:types": "tsc --emitDeclarationOnly",
     "dev": "bun --watch run src/index.ts",
     "test": "vitest run",
@@ -13,12 +13,7 @@
   },
   "dependencies": {
     "@effect/ai-anthropic": "4.0.0-beta.31",
-    "@effect/opentelemetry": "4.0.0-beta.31",
     "@effect/platform-bun": "4.0.0-beta.31",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
-    "@opentelemetry/sdk-trace-base": "^2.5.1",
-    "@opentelemetry/sdk-trace-node": "^2.5.1",
     "@repo/domain": "workspace:*",
     "effect": "4.0.0-beta.31"
   },

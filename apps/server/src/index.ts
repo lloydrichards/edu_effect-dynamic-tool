@@ -1,10 +1,7 @@
-import * as NodeSdk from "@effect/opentelemetry/NodeSdk";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Api } from "@repo/domain/Api";
 import { EventRpc } from "@repo/domain/Rpc";
-import { Config, Effect, Layer, Option } from "effect";
+import { Config, Effect, Layer } from "effect";
 import { Prompt } from "effect/unstable/ai";
 import { DevTools } from "effect/unstable/devtools";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http";
@@ -56,11 +53,6 @@ const ServerConfig = Config.all({
   enableDevTools: Config.boolean("DEVTOOLS").pipe(Config.withDefault(false)),
 });
 
-const TracingConfig = Config.all({
-  exporterEndpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT")),
-  serviceName: Config.option(Config.string("OTEL_SERVICE_NAME")),
-});
-
 // ============================================================================
 // Router Composition
 // ============================================================================
@@ -90,27 +82,6 @@ const HttpRpcRouter = RpcServer.layerHttp({
 // ============================================================================
 // Server Launch
 // ============================================================================
-const NodeSdkLive = Effect.gen(function* () {
-  const tracing = yield* TracingConfig;
-  const endpoint = Option.getOrUndefined(tracing.exporterEndpoint);
-  const serviceName = Option.getOrUndefined(tracing.serviceName);
-
-  if (!endpoint || !serviceName) {
-    yield* Effect.log(
-      "OTEL tracing disabled (set OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_SERVICE_NAME to enable)",
-    );
-    return Layer.empty;
-  }
-
-  yield* Effect.log(`OTEL tracing enabled: ${serviceName} -> ${endpoint}`);
-  return NodeSdk.layer(() => ({
-    resource: { serviceName },
-    spanProcessor: new BatchSpanProcessor(
-      new OTLPTraceExporter({ url: endpoint }),
-    ),
-  }));
-}).pipe(Layer.unwrap);
-
 const DevToolsLive = Effect.gen(function* () {
   const config = yield* ServerConfig;
   if (!config.enableDevTools) {
@@ -144,7 +115,6 @@ const HttpLive = Effect.gen(function* () {
   return HttpRouter.serve(AllRouters).pipe(
     HttpServer.withLogAddress,
     Layer.provideMerge(DevToolsLive),
-    Layer.provideMerge(NodeSdkLive),
     Layer.provideMerge(BunHttpServer.layerConfig(ServerConfig)),
   );
 }).pipe(Layer.unwrap, Layer.launch);
