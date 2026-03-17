@@ -1,37 +1,17 @@
 import { Effect, Layer, Schema } from "effect";
-import { type McpSchema, Tool, Toolkit } from "effect/unstable/ai";
-import {
-  McpClient,
-  type McpClientError,
-  type McpClientOptions,
-  type McpClientSession,
-} from "../services/McpClient";
+import { Tool, Toolkit } from "effect/unstable/ai";
+import { McpClient, type McpClientOptions } from "../services/McpClient";
 
-export type McpToolkitBundle = {
-  readonly toolkit: Toolkit.Any;
-  readonly layer: Layer.Layer<any>;
-  readonly session: McpClientSession;
-  readonly tools: ReadonlyArray<typeof McpSchema.Tool.Type>;
+type McpToolkitOptions = McpClientOptions & {
+  readonly namePrefix?: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-/**
- * Create an MCP toolkit from an MCP server.
- *
- * This function:
- * 1. Connects to the MCP server and initializes a session
- * 2. Fetches all available tools
- * 3. Creates a dynamic toolkit with handlers that call the MCP server
- */
-export const createMcpToolkit = (
-  options: McpClientOptions & {
-    readonly namePrefix?: string;
-  },
-): Effect.Effect<McpToolkitBundle, McpClientError> =>
+export const createMcpToolkit = (options: McpToolkitOptions) =>
   Effect.gen(function* () {
-    const mcpClientLayer = McpClient.layer(options);
+    const mcpClientLayer = Layer.effect(McpClient)(McpClient.make(options));
     const { session, tools } = yield* Effect.scoped(
       Effect.gen(function* () {
         const client = yield* McpClient;
@@ -44,10 +24,10 @@ export const createMcpToolkit = (
     if (tools.length === 0) {
       return {
         toolkit: Toolkit.empty,
-        layer: Layer.empty as Layer.Layer<any>,
+        layer: Layer.empty,
         session,
         tools,
-      } satisfies McpToolkitBundle;
+      };
     }
 
     const dynamicTools = tools.map((tool) =>
@@ -76,7 +56,7 @@ export const createMcpToolkit = (
 
               const client = yield* McpClient;
               const result = yield* client
-                .callTool({
+                .toolCall({
                   name: tool.name,
                   arguments: input,
                 })
@@ -113,5 +93,7 @@ export const createMcpToolkit = (
       layer: toolkit.toLayer(handlers),
       session,
       tools,
-    } satisfies McpToolkitBundle;
+    };
   });
+
+export type McpToolkit = Effect.Success<ReturnType<typeof createMcpToolkit>>;
