@@ -1,11 +1,11 @@
 import { Effect, Layer, Ref, ServiceMap } from "effect";
-import { createMcpToolkit, type McpToolkitBundle } from "./McpToolkit";
+import { createMcpToolkit, McpToolkit } from "./McpToolkit";
 
 export class ExternalMcpToolkit extends ServiceMap.Service<ExternalMcpToolkit>()(
   "ExternalMcpToolkit",
   {
     make: Effect.gen(function* () {
-      const ref = yield* Ref.make<McpToolkitBundle | null>(null);
+      const ref = yield* Ref.make<McpToolkit | null>(null);
 
       const refresh = () =>
         Effect.gen(function* () {
