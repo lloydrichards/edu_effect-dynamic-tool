@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
+import { EmptyParams } from "effect/unstable/ai/Tool";
 
 /**
  * Calculator Tool - Safely evaluates mathematical expressions
@@ -31,11 +32,7 @@ const echoTool = Tool.make("echo", {
 const getCurrentTimeTool = Tool.make("getCurrentTime", {
   description:
     "Get the current date and time in a given timezone. Example: getCurrentTime(timezone: 'UTC')",
-  parameters: Schema.Struct({
-    timezone: Schema.String.annotate({
-      description: "IANA timezone identifier (e.g. 'UTC', 'America/New_York')",
-    }),
-  }),
+  parameters: EmptyParams,
   success: Schema.String,
 });
 
@@ -85,12 +82,8 @@ export const SampleToolkitLive = SampleToolkit.toLayer(
               return `${params.expression} = ${value}`;
             },
             catch: (error) =>
-              new Error(
-                `Invalid expression: ${error instanceof Error ? error.message : String(error)}`,
-              ),
-          }).pipe(
-            Effect.catch((error) => Effect.succeed(`Error: ${error.message}`)),
-          );
+              `Invalid expression: ${error instanceof Error ? error.message : String(error)}`,
+          }).pipe(Effect.catch((error) => Effect.succeed(`Error: ${error}`)));
         }),
 
       echo: (params) =>
@@ -99,15 +92,15 @@ export const SampleToolkitLive = SampleToolkit.toLayer(
           return yield* Effect.succeed(`Echo: ${params.message}`);
         }),
 
-      getCurrentTime: (params) =>
+      getCurrentTime: () =>
         Effect.gen(function* () {
           const now = new Date();
           const timeString = now.toLocaleString("en-US", {
-            timeZone: params.timezone,
+            timeZone: "UTC",
           });
-          yield* Effect.log(`Current time (${params.timezone}): ${timeString}`);
+          yield* Effect.log(`Current time (UTC): ${timeString}`);
           return yield* Effect.succeed(
-            `Current time in ${params.timezone}: ${timeString} (ISO: ${now.toISOString()})`,
+            `Current time in UTC: ${timeString} (ISO: ${now.toISOString()})`,
           );
         }),
 
